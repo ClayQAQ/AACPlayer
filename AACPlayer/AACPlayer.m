@@ -78,6 +78,9 @@ const uint32_t CONST_BUFFER_SIZE = 0x10000;
 
     readedPacket = 0;
     for (int i = 0; i < CONST_BUFFER_COUNT; ++i) {
+        //CONST_BUFFER_COUNT是指的3个音频缓冲区
+        //CONST_BUFFER_SIZE是一个缓冲区的大小, 还挺大的字节数
+        //方法是用来-> 申请3个音频缓冲区
         AudioQueueAllocateBuffer(audioQueue, CONST_BUFFER_SIZE, &audioBuffers[i]); // Asks an audio queue object to allocate an audio queue buffer.
         if ([self fillBuffer:audioBuffers[i]]) {
             // full
@@ -87,6 +90,8 @@ const uint32_t CONST_BUFFER_SIZE = 0x10000;
     }
 }
 
+//A callback function to use with the playback audio queue.
+//The audio queue invokes the callback when the audio queue has finished acquiring a buffer. 即:3个缓冲区,一开始在customAudioConfig全部填满,  当某个缓冲区添加到audioQueue后, 会自己自动调用此callback, 继续进行填充(填充并加到audioQueue)
 void bufferReady(void *inUserData,AudioQueueRef inAQ,
                  AudioQueueBufferRef buffer){
     NSLog(@"refresh buffer");
@@ -103,7 +108,9 @@ void bufferReady(void *inUserData,AudioQueueRef inAQ,
 
 
 - (void)play {
+    //音量设置  //设置都是配置给audioQueue
     AudioQueueSetParameter(audioQueue, kAudioQueueParam_Volume, 1.0); // Sets a playback audio queue parameter value.
+    //开始播放
     AudioQueueStart(audioQueue, NULL); // Begins playing or recording audio.
 }
 
@@ -141,8 +148,9 @@ void bufferReady(void *inUserData,AudioQueueRef inAQ,
     NSAssert(status == noErr, ([NSString stringWithFormat:@"error status %d", status]) );
     if (packets > 0) { //packets:读到的packets数量
         buffer->mAudioDataByteSize = bytes; //填充当次读了多少字节
+        //添加填满后的buffer 到audioQueue中
         AudioQueueEnqueueBuffer(audioQueue, buffer, packets, audioStreamPacketDescrption);
-        readedPacket += packets; //读到的packets总数
+        readedPacket += packets; //记录当前读到的packets索引数
     }
     else { //文件中读不到packet了 -> 可能文件读取完毕; 也可能是当前没有读到
         AudioQueueStop(audioQueue, NO);
