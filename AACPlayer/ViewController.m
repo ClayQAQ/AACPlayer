@@ -56,9 +56,9 @@
 
 
     self.mDispalyLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(updateFrame)];
-    self.mDispalyLink.frameInterval = 5; // 默认是30FPS的帧率录制
+    self.mDispalyLink.preferredFramesPerSecond = 5; // 默认是30FPS的帧率录制
     [self.mDispalyLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSDefaultRunLoopMode];
-    [self.mDispalyLink setPaused:YES];
+//    [self.mDispalyLink setPaused:YES];
 
 }
 - (void)didReceiveMemoryWarning {
@@ -87,7 +87,7 @@
     //AVAudioPlayer 必须设置为属性, 保证生命, 否则无法播放
     _audiopPlayer = [[AVAudioPlayer alloc]initWithContentsOfURL:audioURL error:nil];
     //设置音乐播放次数.numberOfLoops。设为0仅播放一次；设为1则循环1次播放2次；设为-1则循环播放不间断；
-    _audiopPlayer.numberOfLoops = 2;
+    _audiopPlayer.numberOfLoops = -1;
     //设置音乐声音大小.volume。
     _audiopPlayer.volume = 1.0f;
     [_audiopPlayer prepareToPlay];
@@ -114,7 +114,13 @@ void playCallback(SystemSoundID ID, void  * clientData){
 
 - (void)updateFrame {
     if (_aacPlayer) {
-        self.mCurrentTimeLabel.text = [NSString stringWithFormat:@"当前时间:%.1fs", [_aacPlayer getCurrentTime]];
+        double time = [_aacPlayer getCurrentTime];
+        if (time >= 0) {
+            self.mCurrentTimeLabel.text = [NSString stringWithFormat:@"当前时间:%.1fs", time];
+        } else {
+            self.mCurrentTimeLabel.text = [NSString stringWithFormat:@"当前时间:0s"];
+        }
+
     }
 }
 

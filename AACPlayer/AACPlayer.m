@@ -37,16 +37,19 @@ const uint32_t CONST_BUFFER_SIZE = 0x10000;
 
 - (void)customAudioConfig {
     NSURL *url = [[NSBundle mainBundle] URLForResource:@"ribuluo" withExtension:@"aac"];
-
+    //打开音频文件, 得到audioFileID  (audio toolbox 的方法)
     OSStatus status = AudioFileOpenURL((__bridge CFURLRef)url, kAudioFileReadPermission, 0, &audioFileID); //Open an existing audio file specified by a URL.
     if (status != noErr) {
         NSLog(@"打开文件失败 %@", url);
         return ;
     }
     uint32_t size = sizeof(audioStreamBasicDescrpition);
+    //得到音频文件format
     status = AudioFileGetProperty(audioFileID, kAudioFilePropertyDataFormat, &size, &audioStreamBasicDescrpition); // Gets the value of an audio file property.
-    NSAssert(status == noErr, @"error");
+    NSAssert(status == noErr, @"error"); //Generates an assertion if a given condition is false.
 
+    //得到audioQueue
+    //bufferReady是函数指针, 指向的函数会重复填充音频数据packet 进行播放; A callback function to use with the playback audio queue. The audio queue invokes the callback when the audio queue has finished acquiring a buffer.
     status = AudioQueueNewOutput(&audioStreamBasicDescrpition, bufferReady, (__bridge void * _Nullable)(self), NULL, NULL, 0, &audioQueue); // Creates a new playback audio queue object.
     NSAssert(status == noErr, @"error");
 
@@ -65,8 +68,8 @@ const uint32_t CONST_BUFFER_SIZE = 0x10000;
         audioStreamPacketDescrption = nil;
     }
 
-    char cookies[100];
-    memset(cookies, 0, sizeof(cookies));
+    char cookies[100] = {0};
+//    memset(cookies, 0, sizeof(cookies));
     // 这里的100 有问题
     AudioFileGetProperty(audioFileID, kAudioFilePropertyMagicCookieData, &size, cookies); // Some file types require that a magic cookie be provided before packets can be written to an audio file.
     if (size > 0) {
@@ -108,15 +111,40 @@ void bufferReady(void *inUserData,AudioQueueRef inAQ,
 - (bool)fillBuffer:(AudioQueueBufferRef)buffer {
     bool full = NO;
     uint32_t bytes = 0, packets = (uint32_t)packetNums;
+    //读aac文件的packets
+    /*!
+        @function    AudioFileReadPackets
+        @abstract   Read packets of audio data from the audio file.
+        @discussion AudioFileReadPackets is DEPRECATED. Use AudioFileReadPacketData instead.
+                    READ THE HEADER DOC FOR AudioFileReadPacketData. It is not a drop-in replacement.
+                    In particular, for AudioFileReadPacketData ioNumBytes must be initialized to the buffer size.
+                    AudioFileReadPackets assumes you have allocated your buffer to ioNumPackets times the maximum packet size.
+                    For many compressed formats this will only use a portion of the buffer since the ratio of the maximum
+                    packet size to the typical packet size can be large. Use AudioFileReadPacketData instead.
+
+        @param inAudioFile                an AudioFileID.
+        @param inUseCache                 true if it is desired to cache the data upon read, else false
+        @param outNumBytes      读了多少字节           on output, the number of bytes actually returned
+        @param outPacketDescriptions     on output, an array of packet descriptions describing
+                                        the packets being returned. NULL may be passed for this
+                                        parameter. Nothing will be returned for linear pcm data.
+        @param inStartingPacket         the packet index of the first packet desired to be returned
+        @param ioNumPackets 读了多少packet            on input, the number of packets to read, on output, the number of
+                                        packets actually read.
+        @param outBuffer     返回packet数据            outBuffer should be a pointer to user allocated memory of size:
+                                        number of packets requested times file's maximum (or upper bound on)
+                                        packet size.
+        @result                            returns noErr if successful.
+    */
     OSStatus status = AudioFileReadPackets(audioFileID, NO, &bytes, audioStreamPacketDescrption, readedPacket, &packets, buffer->mAudioData); // Reads packets of audio data from an audio file.
 
     NSAssert(status == noErr, ([NSString stringWithFormat:@"error status %d", status]) );
-    if (packets > 0) {
-        buffer->mAudioDataByteSize = bytes;
+    if (packets > 0) { //packets:读到的packets数量
+        buffer->mAudioDataByteSize = bytes; //填充当次读了多少字节
         AudioQueueEnqueueBuffer(audioQueue, buffer, packets, audioStreamPacketDescrption);
-        readedPacket += packets;
+        readedPacket += packets; //读到的packets总数
     }
-    else {
+    else { //文件中读不到packet了 -> 可能文件读取完毕; 也可能是当前没有读到
         AudioQueueStop(audioQueue, NO);
         full = YES;
     }
@@ -135,7 +163,7 @@ void bufferReady(void *inUserData,AudioQueueRef inAQ,
         if(status == noErr)
         {
             AudioQueueGetCurrentTime(audioQueue, timeLine, &timeStamp, NULL); // Gets the current audio queue time.
-            timeInterval = timeStamp.mSampleTime * 1000000 / audioStreamBasicDescrpition.mSampleRate; // The number of sample frames per second of the data in the stream.
+            timeInterval = timeStamp.mSampleTime / audioStreamBasicDescrpition.mSampleRate; // The number of sample frames per second of the data in the stream.
         }
     }
     return timeInterval;
