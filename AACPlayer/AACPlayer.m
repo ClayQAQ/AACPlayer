@@ -177,5 +177,12 @@ void bufferReady(void *inUserData,AudioQueueRef inAQ,
     return timeInterval;
 }
 
+//处理内存泄漏问题
+- (void)dealloc {
+    NSLog(@"AACPlayer dealloc -=-=-=-=");
+    for (int i =0; i<CONST_BUFFER_COUNT; i++) {
+        AudioQueueFreeBuffer(audioQueue,audioBuffers[i]);
+    }
+}
 
 @end
