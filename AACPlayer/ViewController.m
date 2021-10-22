@@ -100,6 +100,7 @@
 }
 
 void playCallback(SystemSoundID ID, void  * clientData){
+    //3. 使用audioQueue 播放 (基于AudioToolbox框架, 填充3缓冲区加入音频队列)
     ViewController* controller = (__bridge ViewController *)clientData;
     [controller onPlayCallback];
 }
